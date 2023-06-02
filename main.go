@@ -107,7 +107,6 @@ func main() {
 
 	host := flag.String("h", "", "host url")
 	flag.Parse()
-	fmt.Println(headers)
 
 	r := NewRunner(*host, *c, *i, headers)
 	r.Run()
