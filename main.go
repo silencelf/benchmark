@@ -19,6 +19,7 @@ type Runner struct {
 	iteration   int
 	mu          sync.Mutex
 	completed   int
+	success     int
 	total       int
 	headers     Headers
 }
@@ -34,6 +35,20 @@ func (r *Runner) Run() {
 			go r.request()
 		}
 		time.Sleep(time.Second)
+	}
+}
+
+func (r *Runner) IncreaseCounter(success bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.completed++
+	if success {
+		r.success++
+	}
+
+	if r.completed == r.total {
+		log.Printf("Success/Total: %v/%v. \n", r.success, r.total)
 	}
 }
 
@@ -57,15 +72,7 @@ func (r *Runner) request() {
 		fmt.Println(err.Error())
 	}
 	defer resp.Body.Close()
-	defer func() {
-		r.mu.Lock()
-		defer r.mu.Unlock()
-
-		r.completed++
-		if r.completed == r.total {
-			log.Println("All tasks are completed.")
-		}
-	}()
+	defer r.IncreaseCounter(resp.StatusCode == http.StatusOK)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -75,15 +82,6 @@ func (r *Runner) request() {
 	duration := end.Sub(start)
 	log.Printf("Response Status: %v, Response Length: %v, Duration: %v", resp.Status, len(body), duration)
 	//log.Println(string(body))
-}
-
-func timeit(f func()) {
-	start := time.Now()
-	f()
-	end := time.Now()
-	duration := end.Sub(start)
-
-	log.Println("execution time:", duration)
 }
 
 type Headers []string
@@ -112,5 +110,5 @@ func main() {
 	r.Run()
 
 	<-quit
-	fmt.Println("Shutdown ...")
+	fmt.Println("Shutdown...")
 }
