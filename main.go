@@ -18,14 +18,18 @@ type Runner struct {
 	concurrency int
 	iteration   int
 	mu          sync.Mutex
-	completed   int
-	success     int
-	total       int
 	headers     Headers
+	ct          counter
+}
+
+type counter struct {
+	completed int
+	success   int
+	total     int
 }
 
 func NewRunner(host string, concurrency int, iteration int, headers Headers) *Runner {
-	return &Runner{url: host, concurrency: concurrency, iteration: iteration, completed: 0, total: concurrency * iteration, headers: headers}
+	return &Runner{url: host, concurrency: concurrency, iteration: iteration, ct: counter{total: concurrency * iteration}, headers: headers}
 }
 
 func (r *Runner) Run() {
@@ -42,13 +46,13 @@ func (r *Runner) IncreaseCounter(success bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.completed++
+	r.ct.completed++
 	if success {
-		r.success++
+		r.ct.success++
 	}
 
-	if r.completed == r.total {
-		log.Printf("Success/Total: %v/%v. \n", r.success, r.total)
+	if r.ct.completed == r.ct.total {
+		log.Printf("Success/Total: %v/%v. \n", r.ct.success, r.ct.total)
 	}
 }
 
@@ -81,7 +85,6 @@ func (r *Runner) request() {
 	end := time.Now()
 	duration := end.Sub(start)
 	log.Printf("Response Status: %v, Response Length: %v, Duration: %v", resp.Status, len(body), duration)
-	//log.Println(string(body))
 }
 
 type Headers []string
