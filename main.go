@@ -20,6 +20,8 @@ type Runner struct {
 	mu          sync.Mutex
 	headers     Headers
 	ct          counter
+	results     []Result
+	verbose     bool
 }
 
 type counter struct {
@@ -28,18 +30,38 @@ type counter struct {
 	total     int
 }
 
-func NewRunner(host string, concurrency int, iteration int, headers Headers) *Runner {
+type Result struct {
+	url           string
+	success       bool
+	status        string
+	statusCode    int
+	contentLength int
+	duration      time.Duration
+}
+
+func (r Result) String() string {
+	return fmt.Sprint(r.url, r.status, r.statusCode, r.contentLength, r.duration.Milliseconds())
+}
+
+func NewRunner(host string, concurrency int, iteration int, headers Headers, verbose bool) *Runner {
 	if !strings.HasPrefix(host, "http") {
 		host = "http://" + host
 	}
-	return &Runner{url: host, concurrency: concurrency, iteration: iteration, ct: counter{total: concurrency * iteration}, headers: headers}
+	return &Runner{
+		url:         host,
+		concurrency: concurrency,
+		iteration:   iteration,
+		ct:          counter{total: concurrency * iteration},
+		headers:     headers,
+		verbose:     verbose,
+	}
 }
 
 func (r *Runner) Run() {
 	for i := r.iteration; i > 0; i-- {
 		log.Println("Iteration", r.iteration-i+1)
 		for c := r.concurrency; c > 0; c-- {
-			go r.request()
+			go r.trackIt(r.request)
 		}
 		time.Sleep(time.Second)
 	}
@@ -55,15 +77,19 @@ func (r *Runner) IncreaseCounter(success bool) {
 	}
 
 	if r.ct.completed == r.ct.total {
+		for i, v := range r.results {
+			fmt.Println(i, ":", v)
+		}
 		log.Printf("Success/Total: %v/%v. \n", r.ct.success, r.ct.total)
 	}
 }
 
-func (r *Runner) request() {
+func (r *Runner) request() (Result, error) {
 	start := time.Now()
 	req, err := http.NewRequest("GET", r.url, nil)
 	if err != nil {
 		fmt.Println(err.Error())
+		return Result{url: r.url, success: false, statusCode: -1, status: err.Error()}, err
 	}
 
 	for _, h := range r.headers {
@@ -77,17 +103,30 @@ func (r *Runner) request() {
 	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Println(err.Error())
+		return Result{url: r.url, success: false, statusCode: -1, status: err.Error()}, err
 	}
 	defer resp.Body.Close()
-	defer r.IncreaseCounter(resp.StatusCode == http.StatusOK)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err.Error())
+		return Result{url: r.url, success: false, statusCode: -1, status: err.Error()}, err
 	}
 	end := time.Now()
 	duration := end.Sub(start)
-	log.Printf("Response Status: %v, Response Length: %v, Duration: %v", resp.Status, len(body), duration)
+
+	return Result{url: r.url, success: true, statusCode: resp.StatusCode, duration: duration, contentLength: len(body)}, nil
+}
+
+func (r *Runner) trackIt(fn func() (Result, error)) {
+	start := time.Now()
+	result, _ := fn()
+	end := time.Now()
+	result.duration = end.Sub(start)
+	if r.verbose {
+		log.Println(result)
+	}
+	r.IncreaseCounter(result.success)
 }
 
 type Headers []string
@@ -104,17 +143,18 @@ func (h *Headers) Set(value string) error {
 func main() {
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
-	c := flag.Int("c", 1, "concurrency level")
-	i := flag.Int("i", 1, "iterations")
+	c := flag.Int("c", 1, "Concurrency level")
+	i := flag.Int("i", 1, "Iterations")
+	v := flag.Bool("v", false, "Verbose mode.")
+	host := flag.String("h", "", "host url")
 	var headers Headers
 	flag.Var(&headers, "H", "")
-
-	host := flag.String("h", "", "host url")
 	flag.Parse()
 
-	r := NewRunner(*host, *c, *i, headers)
+	r := NewRunner(*host, *c, *i, headers, *v)
 	r.Run()
 
 	<-quit
+
 	fmt.Println("Shutdown...")
 }
