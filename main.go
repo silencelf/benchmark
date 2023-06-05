@@ -29,7 +29,7 @@ type counter struct {
 }
 
 func NewRunner(host string, concurrency int, iteration int, headers Headers) *Runner {
-	if !strings.HasPrefix("http", host) {
+	if !strings.HasPrefix(host, "http") {
 		host = "http://" + host
 	}
 	return &Runner{url: host, concurrency: concurrency, iteration: iteration, ct: counter{total: concurrency * iteration}, headers: headers}
