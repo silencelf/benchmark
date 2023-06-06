@@ -40,7 +40,7 @@ type Result struct {
 }
 
 func (r Result) String() string {
-	return fmt.Sprint(r.url, r.status, r.statusCode, r.contentLength, r.duration.Milliseconds())
+	return fmt.Sprintf("%v status:%v code:%v length:%v duration:%v(ms)", r.url, r.status, r.statusCode, r.contentLength, r.duration.Milliseconds())
 }
 
 func NewRunner(host string, concurrency int, iteration int, headers Headers, verbose bool) *Runner {
@@ -78,8 +78,8 @@ func (r *Runner) IncreaseCounter(re Result) {
 	r.results = append(r.results, re)
 
 	if r.ct.completed == r.ct.total {
-		for i, v := range r.results {
-			fmt.Println(i, ":", v)
+		for _, v := range r.results {
+			fmt.Println(v)
 		}
 		log.Printf("Success/Total: %v/%v. \n", r.ct.success, r.ct.total)
 	}
