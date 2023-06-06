@@ -86,7 +86,6 @@ func (r *Runner) IncreaseCounter(re Result) {
 }
 
 func (r *Runner) request() (Result, error) {
-	start := time.Now()
 	req, err := http.NewRequest("GET", r.url, nil)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -108,15 +107,17 @@ func (r *Runner) request() (Result, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode >= 400 {
+		return Result{url: r.url, success: false, statusCode: resp.StatusCode, status: resp.Status}, err
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err.Error())
 		return Result{url: r.url, success: false, statusCode: -1, status: err.Error()}, err
 	}
-	end := time.Now()
-	duration := end.Sub(start)
 
-	return Result{url: r.url, success: true, statusCode: resp.StatusCode, duration: duration, contentLength: len(body)}, nil
+	return Result{url: r.url, success: true, status: resp.Status, statusCode: resp.StatusCode, contentLength: len(body)}, nil
 }
 
 func (r *Runner) trackIt(fn func() (Result, error)) {
