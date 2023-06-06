@@ -67,14 +67,15 @@ func (r *Runner) Run() {
 	}
 }
 
-func (r *Runner) IncreaseCounter(success bool) {
+func (r *Runner) IncreaseCounter(re Result) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.ct.completed++
-	if success {
+	if re.success {
 		r.ct.success++
 	}
+	r.results = append(r.results, re)
 
 	if r.ct.completed == r.ct.total {
 		for i, v := range r.results {
@@ -126,7 +127,7 @@ func (r *Runner) trackIt(fn func() (Result, error)) {
 	if r.verbose {
 		log.Println(result)
 	}
-	r.IncreaseCounter(result.success)
+	r.IncreaseCounter(result)
 }
 
 type Headers []string
