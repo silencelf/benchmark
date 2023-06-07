@@ -78,9 +78,16 @@ func (r *Runner) IncreaseCounter(re Result) {
 	r.results = append(r.results, re)
 
 	if r.ct.completed == r.ct.total {
+		codes := make(map[int]int)
 		for _, v := range r.results {
-			fmt.Println(v)
+			codes[v.statusCode] += 1
+			log.Println(v)
 		}
+
+		for k, v := range codes {
+			log.Printf("%+3v: %d\n", k, v)
+		}
+
 		log.Printf("Success/Total: %v/%v. \n", r.ct.success, r.ct.total)
 	}
 }
